@@ -1,0 +1,17 @@
+# Netlify — deploy the React frontend (base directory: frontend/)
+# Backend must run separately (see DEPLOY.md / render.yaml), e.g. Render.com
+
+[build]
+  base = "frontend"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# SPA: client-side routes fall back to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

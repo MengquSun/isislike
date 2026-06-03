@@ -1,0 +1,20 @@
+# Render.com — hosts the FastAPI + RDKit API (required for Netlify frontend)
+# Dashboard: New + Blueprint → connect this repo
+
+services:
+  - type: web
+    name: isislike-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: http://localhost:5173
+        # After Netlify deploy, add your site URL, e.g.:
+        # https://your-app.netlify.app,http://localhost:5173
