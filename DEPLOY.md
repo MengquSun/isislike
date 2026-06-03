@@ -28,8 +28,40 @@ git push -u origin main
 
 ## 第 1 步：部署后端（Render）
 
-1. 打开 [render.com](https://render.com) → 注册/登录 → **New +** → **Blueprint**
-2. 连接你的 GitHub 仓库，Render 会读取根目录的 `render.yaml`
+### 方式 A：Blueprint（推荐）
+
+1. 打开 [render.com](https://render.com) → **New +** → **Blueprint**
+2. 连接 GitHub 仓库 [MengquSun/isislike](https://github.com/MengquSun/isislike)，自动读取 `render.yaml`
+3. 创建时填写环境变量（见下表）
+
+### 方式 B：已有 Web Service（你当前的 `isislike`）
+
+在 **Settings** 里确认（_build 失败多半是 Docker 上下文不对_）：
+
+| 项 | 正确值 |
+|----|--------|
+| **Runtime** | Docker |
+| **Root Directory** | 留空 |
+| **Dockerfile Path** | `./Dockerfile`（仓库**根目录**这份，见下文） |
+| **Docker Build Context** | `.`（仓库根目录） |
+| **Health Check Path** | `/health` |
+
+不要用 `backend/Dockerfile` 却把 Context 设成仓库根目录——`COPY requirements.txt` 会失败。
+
+**Environment** 里添加：
+
+| 变量 | 值 |
+|------|-----|
+| `SUPABASE_URL` | `https://lgwofoudcmtnhrjnequv.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` 里的 `sb_secret_...` |
+| `CORS_ORIGINS` | 先 `http://localhost:5173`，Netlify 上线后再加站点 URL |
+
+保存后 **Manual Deploy** → **Clear build cache & deploy**。
+
+---
+
+### 环境变量（Blueprint / Web Service 通用）
+
 3. 创建服务时填写环境变量（**Secret**，不要公开）：
 
 | 变量 | 值 |
