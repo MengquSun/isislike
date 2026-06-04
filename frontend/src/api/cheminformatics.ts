@@ -28,6 +28,8 @@ function formatNetworkError(op: string, err: unknown): string {
   return err instanceof Error ? err.message : `${op} failed`;
 }
 
+import type { LinkedDatabaseRecord } from "./databases";
+
 export interface Molecule {
   id: string;
   canonical_smiles: string;
@@ -38,7 +40,10 @@ export interface Molecule {
   notes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  linked_database_records?: LinkedDatabaseRecord[];
 }
+
+export type { LinkedDatabaseRecord };
 
 export interface MoleculeDetail extends Molecule {
   has_structure_svg: boolean;

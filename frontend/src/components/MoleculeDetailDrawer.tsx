@@ -6,6 +6,7 @@ import {
   type Molecule,
   type MoleculeDetail,
 } from "../api/cheminformatics";
+import LinkedDatabaseRecords from "./LinkedDatabaseRecords";
 import StructureImage from "./StructureImage";
 
 interface Props {
@@ -76,9 +77,22 @@ export default function MoleculeDetailDrawer({
         name: name.trim() || null,
         notes: notes.trim() || null,
       });
-      setDetail((d) => (d ? { ...d, ...updated } : null));
+      setDetail((d) =>
+        d
+          ? {
+              ...d,
+              ...updated,
+              linked_database_records:
+                updated.linked_database_records ?? d.linked_database_records,
+            }
+          : null
+      );
       setStatus("Saved.");
-      onUpdated(updated);
+      onUpdated({
+        ...updated,
+        linked_database_records:
+          detail?.linked_database_records ?? updated.linked_database_records,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -166,6 +180,10 @@ export default function MoleculeDetailDrawer({
                   <dd>{formatDate(detail.updated_at)}</dd>
                 </div>
               </dl>
+
+              <LinkedDatabaseRecords
+                records={detail.linked_database_records ?? []}
+              />
 
               <div className="detail-form">
                 <label htmlFor="mol-name">Name</label>

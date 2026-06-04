@@ -26,6 +26,7 @@ class MoleculeResponse(BaseModel):
     notes: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    linked_database_records: list["LinkedDatabaseRecord"] = Field(default_factory=list)
 
 
 class MoleculeDetailResponse(MoleculeResponse):
@@ -61,3 +62,102 @@ class ImportResponse(BaseModel):
     success_count: int
     failed_count: int
     errors: list[ImportErrorItem]
+
+
+# --- Phase 2A: dynamic fields ---
+
+FIELD_TYPES_MVP = frozenset({"text", "number", "date", "select"})
+
+
+class DatabaseCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: str | None = None
+
+
+class DatabaseUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    description: str | None = None
+
+
+class DatabaseResponse(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    created_at: str | None = None
+
+
+class FieldDefinitionCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    field_type: str = Field(..., min_length=1)
+    options: dict | None = None
+    sort_order: int = 0
+
+
+class FieldDefinitionUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    field_type: str | None = None
+    options: dict | None = None
+    sort_order: int | None = None
+
+
+class FieldDefinitionResponse(BaseModel):
+    id: str
+    database_id: str
+    name: str
+    field_type: str
+    options: dict | None = None
+    sort_order: int
+    created_at: str | None = None
+
+
+class RecordValueResponse(BaseModel):
+    field_id: str
+    field_name: str | None = None
+    field_type: str | None = None
+    text_value: str | None = None
+    number_value: float | None = None
+    date_value: str | None = None
+
+
+class LinkedDatabaseRecord(BaseModel):
+    record_id: str
+    database_id: str
+    database_name: str
+    canonical_smiles: str
+    values: list[RecordValueResponse] = Field(default_factory=list)
+
+
+class RecordCreate(BaseModel):
+    smiles: str = Field(..., min_length=1, description="Raw or canonical SMILES; resolved via RDKit")
+    values: dict[str, str | int | float | None] = Field(
+        default_factory=dict,
+        description="Map of field_definition id -> value",
+    )
+
+
+class RecordUpdate(BaseModel):
+    smiles: str | None = Field(default=None, min_length=1)
+    values: dict[str, str | int | float | None] | None = None
+
+
+class RecordResponse(BaseModel):
+    id: str
+    database_id: str
+    molecule_id: str
+    canonical_smiles: str
+    created_at: str | None = None
+    updated_at: str | None = None
+    values: list[RecordValueResponse] = Field(default_factory=list)
+
+
+class MoleculeIdsInput(BaseModel):
+    molecule_ids: list[str] = Field(default_factory=list, max_length=500)
+
+
+class LinkedRecordsByMolecule(BaseModel):
+    molecule_id: str
+    records: list[LinkedDatabaseRecord] = Field(default_factory=list)
+
+
+MoleculeResponse.model_rebuild()
+MoleculeDetailResponse.model_rebuild()
