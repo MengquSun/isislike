@@ -90,13 +90,13 @@ async def save_molecule(body: SaveMoleculeRequest):
 
 
 async def _import_props_batch(
-    items: list[tuple[rdkit_service.MoleculeProperties, str | None, str | None]],
+    items: list[
+        tuple[rdkit_service.MoleculeProperties, str | None, str | None, int]
+    ],
     errors: list[ImportErrorItem],
-    *,
-    row_index: int = -1,
 ) -> int:
     success_count = 0
-    for props, name, notes in items:
+    for props, name, notes, row_index in items:
         try:
             await supabase_client.insert_molecule(props, name=name, notes=notes)
             success_count += 1
@@ -117,7 +117,8 @@ async def import_molecules(file: UploadFile = File(...)):
     """
     Import .mol, .sdf, or .xlsx (Excel).
     Structures are canonicalized with RDKit; fingerprint and SVG are stored.
-    Excel: first sheet must include a SMILES column; optional Name / Notes.
+    Excel: SMILES column, or MOLNAME / compound name only (PubChem/CIR lookup).
+    Optional Name / Notes columns.
     """
     filename = (file.filename or "").lower()
     data = await file.read()
@@ -129,18 +130,18 @@ async def import_molecules(file: UploadFile = File(...)):
 
     try:
         if filename.endswith((".xlsx", ".xlsm")):
-            excel_rows, parse_errors = excel_import.parse_excel_bytes(data)
+            excel_rows, parse_errors = await excel_import.parse_excel_bytes(data)
             errors.extend(
                 ImportErrorItem(index=e.index, reason=e.reason) for e in parse_errors
             )
-            batch = [(r.props, r.name, r.notes) for r in excel_rows]
+            batch = [(r.props, r.name, r.notes, r.excel_row) for r in excel_rows]
             success_count = await _import_props_batch(batch, errors)
         elif filename.endswith(".sdf") or b"$$$$" in data[:4096]:
             props_list, parse_errors = rdkit_service.parse_sdf_bytes(data)
             errors.extend(
                 ImportErrorItem(index=e.index, reason=e.reason) for e in parse_errors
             )
-            batch = [(p, None, None) for p in props_list]
+            batch = [(p, None, None, idx) for idx, p in enumerate(props_list)]
             success_count = await _import_props_batch(batch, errors)
         elif filename.endswith(".mol") or b"M  END" in data or b"V2000" in data or b"V3000" in data:
             props = rdkit_service.parse_molfile_bytes(data)
