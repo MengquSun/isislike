@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
+# Install RDKit wheel first (large); avoid uvicorn[standard] native builds on slim images
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir "rdkit==2024.9.5" \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app

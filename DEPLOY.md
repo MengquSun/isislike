@@ -131,6 +131,8 @@ https://你的站点.netlify.app,http://localhost:5173
 
 | 问题 | 处理 |
 |------|------|
+| **Build failed / status 1**（Events 里只有 `94178e9`） | 在 Settings 把 **Dockerfile Path** 设为 `./Dockerfile`、**Context** 为 `.`；**Manual Deploy → Clear build cache** 拉取最新 `main`（含根目录 Dockerfile） |
+| `COPY requirements.txt` / file not found | Docker 上下文必须是仓库根，或 Context=`backend` 且 Dockerfile=`backend/Dockerfile`（二选一，不要混用） |
 | 页面能开，列表/API 报错 | 检查 `VITE_CHEMINFORMATICS_API_URL`；Render 是否已唤醒 `/health` |
 | CORS 错误 | 在 Render 的 `CORS_ORIGINS` 加上 Netlify 完整 URL |
 | Netlify 构建失败 / 内存不足 | 重试 Deploy；或 Site settings → Build → 提高 memory（付费计划） |
