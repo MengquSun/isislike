@@ -37,6 +37,17 @@ After Phase 1 migration, run **`supabase/migrations/002_phase1_5_molecule_fields
 
 UI: click a results row → right drawer (structure, SMILES, MW, formula, name, notes, save, delete). **Import .mol / .sdf / Excel** in the results panel.
 
+## Phase 2A — Dynamic fields MVP
+
+After Phase 1.5, run **`supabase/migrations/003_phase2a_dynamic_fields.sql`** in the Supabase SQL Editor (`databases`, `field_definitions`, `records`, `record_values`).
+
+| Area | Routes / pages |
+|------|----------------|
+| API | `GET/POST /api/databases`, fields under `/api/databases/{id}/fields`, records under `/api/databases/{id}/records` |
+| UI | `/databases`, `/databases/:id/fields`, `/databases/:id/records` |
+
+Field types (MVP): `text`, `number`, `date`, `select`. Records may set optional `molecule_id` for a primary structure (reuses Phase 1 search/catalog).
+
 ## Prerequisites
 
 - [Supabase](https://supabase.com) project with **pgvector** enabled
@@ -75,6 +86,7 @@ cd "/Users/mengqusun/Desktop/澳赛诺/isislike"
 1. Sidebar → **SQL Editor** → **New query**
 2. Open `supabase/migrations/001_phase1_molecules.sql` locally, copy all, paste, **Run**
 3. Run `supabase/migrations/002_phase1_5_molecule_fields.sql` the same way (Phase 1.5)
+4. Run `supabase/migrations/003_phase2a_dynamic_fields.sql` (Phase 2A)
 4. Expect: “Success” (no rows returned is normal)
 
 **C. Verify**
@@ -237,7 +249,9 @@ POST /api/molecules/search/similarity
 
 ## Roadmap
 
-- **Phase 2:** Vendors, batches, inventory, atomic checkout RPC, audit `transactions` table
+- **Phase 2A (done):** Dynamic databases, custom fields, EAV record values, optional `molecule_id` on records
+- **Phase 2B+:** Vendors, batches, inventory, atomic checkout RPC, audit `transactions` table
+- **Phase 3:** Structure/parent/reaction field types, multi-structure fields
 - **Phase 3:** Additional workflow utilities (export already included)
 
 ## Docker (backend only)
