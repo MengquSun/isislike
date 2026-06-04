@@ -3,9 +3,30 @@
  * The frontend NEVER writes SMILES directly to Supabase.
  */
 
-const API_BASE =
-  import.meta.env.VITE_CHEMINFORMATICS_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:8000";
+/** Production Netlify: empty → same-origin /api (proxied in netlify.toml). Dev: local backend. */
+function resolveApiBase(): string {
+  const fromEnv = import.meta.env.VITE_CHEMINFORMATICS_API_URL?.replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  if (import.meta.env.DEV) return "http://localhost:8000";
+  return "";
+}
+
+const API_BASE = resolveApiBase();
+
+function apiUrl(path: string): string {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return API_BASE ? `${API_BASE}${p}` : p;
+}
+
+function formatNetworkError(op: string, err: unknown): string {
+  if (err instanceof TypeError) {
+    const hint = import.meta.env.DEV
+      ? "Is the backend running on http://localhost:8000?"
+      : "Redeploy Netlify after setting VITE_CHEMINFORMATICS_API_URL or the /api proxy in netlify.toml.";
+    return `${op}: cannot reach API. ${hint}`;
+  }
+  return err instanceof Error ? err.message : `${op} failed`;
+}
 
 export interface Molecule {
   id: string;
@@ -16,11 +37,16 @@ export interface Molecule {
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api${path}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new Error(formatNetworkError("Request", e));
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail =
@@ -34,7 +60,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function listMolecules(limit = 500): Promise<Molecule[]> {
-  const res = await fetch(`${API_BASE}/api/molecules?limit=${limit}`);
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/molecules?limit=${limit}`));
+  } catch (e) {
+    throw new Error(formatNetworkError("See All", e));
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(

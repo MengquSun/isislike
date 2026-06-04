@@ -9,8 +9,17 @@
 [build.environment]
   NODE_VERSION = "20"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  # Baked into the JS bundle at build time (optional if /api proxy below is used)
+  VITE_CHEMINFORMATICS_API_URL = "https://isislike.onrender.com"
 
-# SPA: client-side routes fall back to index.html
+# Proxy API to Render (same-origin /api → no CORS, works even if env var missing)
+[[redirects]]
+  from = "/api/*"
+  to = "https://isislike.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA: client-side routes fall back to index.html (must be after /api)
 [[redirects]]
   from = "/*"
   to = "/index.html"

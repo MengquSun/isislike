@@ -94,7 +94,9 @@ git push -u origin main
 
 | Key | Value |
 |-----|--------|
-| `VITE_CHEMINFORMATICS_API_URL` | `https://isislike-api.onrender.com`（你的 Render 地址，**不要**末尾 `/`） |
+| `VITE_CHEMINFORMATICS_API_URL` | `https://isislike.onrender.com`（你的 Render 地址，**不要**末尾 `/`） |
+
+根目录 `netlify.toml` 已默认写入该变量，并把 `/api/*` 代理到 Render。若 **Save / See All 失败**，在 Netlify 做 **Clear cache and deploy site** 重新构建。
 
 5. **Deploy site**
 6. 得到网址，例如：`https://random-name-123.netlify.app`
