@@ -1,23 +1,30 @@
 import * as XLSX from "xlsx";
 import type { Molecule } from "../api/cheminformatics";
+import StructureImage from "./StructureImage";
 
 interface Props {
   rows: Molecule[];
   showSimilarity?: boolean;
   emptyMessage?: string;
+  onRowClick?: (row: Molecule) => void;
+  selectedId?: string | null;
 }
 
 export default function MoleculeTable({
   rows,
   showSimilarity,
   emptyMessage = "No results yet.",
+  onRowClick,
+  selectedId,
 }: Props) {
   const exportExcel = () => {
     const data = rows.map((r) => ({
       ID: r.id,
+      Name: r.name ?? "",
       "Canonical SMILES": r.canonical_smiles,
       "Mol. Weight": r.molecular_weight ?? "",
       Formula: r.molecular_formula ?? "",
+      Notes: r.notes ?? "",
       ...(showSimilarity ? { Similarity: r.similarity ?? "" } : {}),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -38,38 +45,71 @@ export default function MoleculeTable({
         </button>
         <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
           {rows.length} result{rows.length !== 1 ? "s" : ""}
+          {onRowClick ? " · click a row for details" : ""}
         </span>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Canonical SMILES</th>
-              <th>Formula</th>
-              <th>MW</th>
-              {showSimilarity && <th>Similarity</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <code style={{ fontSize: "0.75rem" }}>{r.canonical_smiles}</code>
-                </td>
-                <td>{r.molecular_formula ?? "—"}</td>
-                <td>{r.molecular_weight?.toFixed(2) ?? "—"}</td>
-                {showSimilarity && (
-                  <td className="similarity-bar">
-                    {r.similarity != null
-                      ? `${(r.similarity * 100).toFixed(1)}%`
+      <ul className="molecule-cards">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className={
+              onRowClick
+                ? `molecule-card${selectedId === r.id ? " selected" : ""}`
+                : "molecule-card"
+            }
+            onClick={onRowClick ? () => onRowClick(r) : undefined}
+            onKeyDown={
+              onRowClick
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onRowClick(r);
+                    }
+                  }
+                : undefined
+            }
+            role={onRowClick ? "button" : undefined}
+            tabIndex={onRowClick ? 0 : undefined}
+          >
+            <div className="molecule-card-structure">
+              <StructureImage
+                moleculeId={r.id}
+                alt={r.name?.trim() || r.canonical_smiles}
+              />
+            </div>
+            <div className="molecule-card-body">
+              <div className="molecule-card-title">
+                {r.name?.trim() || "Unnamed compound"}
+              </div>
+              <dl className="molecule-card-meta">
+                <div>
+                  <dt>Formula</dt>
+                  <dd>{r.molecular_formula ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>MW</dt>
+                  <dd>
+                    {r.molecular_weight != null
+                      ? r.molecular_weight.toFixed(2)
                       : "—"}
-                  </td>
+                  </dd>
+                </div>
+                {showSimilarity && (
+                  <div>
+                    <dt>Similarity</dt>
+                    <dd className="similarity-bar">
+                      {r.similarity != null
+                        ? `${(r.similarity * 100).toFixed(1)}%`
+                        : "—"}
+                    </dd>
+                  </div>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </dl>
+              <code className="molecule-card-smiles">{r.canonical_smiles}</code>
+            </div>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

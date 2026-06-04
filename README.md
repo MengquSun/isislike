@@ -23,6 +23,20 @@ Phase 1 cheminformatics core: **React + Ketcher** → **FastAPI + RDKit** → **
 | Similarity | `POST /api/molecules/search/similarity` | pgvector RPC, Tanimoto via cosine |
 | Export Excel | Client-side (`xlsx`) | Action 8 wired in results table |
 
+## Phase 1.5 — Record management
+
+After Phase 1 migration, run **`supabase/migrations/002_phase1_5_molecule_fields.sql`** in the Supabase SQL Editor (adds `name`, `notes`, `molfile`, `structure_svg`, `updated_at` trigger).
+
+| Action | Endpoint | Notes |
+|--------|----------|-------|
+| View record | `GET /api/molecules/{id}` | Detail drawer |
+| Update metadata | `PATCH /api/molecules/{id}` | `name`, `notes` only |
+| Delete | `DELETE /api/molecules/{id}` | |
+| 2D structure | `GET /api/molecules/{id}/structure.svg` | Stored SVG (generated on save/import) |
+| Import | `POST /api/molecules/import` | Multipart `.mol`, `.sdf`, or `.xlsx` |
+
+UI: click a results row → right drawer (structure, SMILES, MW, formula, name, notes, save, delete). **Import .mol / .sdf / Excel** in the results panel.
+
 ## Prerequisites
 
 - [Supabase](https://supabase.com) project with **pgvector** enabled
@@ -60,7 +74,8 @@ cd "/Users/mengqusun/Desktop/澳赛诺/isislike"
 
 1. Sidebar → **SQL Editor** → **New query**
 2. Open `supabase/migrations/001_phase1_molecules.sql` locally, copy all, paste, **Run**
-3. Expect: “Success” (no rows returned is normal)
+3. Run `supabase/migrations/002_phase1_5_molecule_fields.sql` the same way (Phase 1.5)
+4. Expect: “Success” (no rows returned is normal)
 
 **C. Verify**
 
@@ -190,11 +205,17 @@ Browser (5173)  →  FastAPI (8000)  →  Supabase Postgres (cloud)
      never DB         + fingerprints          + pgvector RPC
 ```
 
-## API Reference (Phase 1)
+## API Reference
 
 ```http
 POST /api/molecules/save
-{ "smiles": "CCO" }
+{ "smiles": "CCO", "molfile": "...", "name": "Ethanol", "notes": "..." }
+
+GET    /api/molecules/{id}
+PATCH  /api/molecules/{id}     { "name": "...", "notes": "..." }
+DELETE /api/molecules/{id}
+GET    /api/molecules/{id}/structure.svg
+POST   /api/molecules/import   multipart file field: file (.mol | .sdf | .xlsx)
 
 POST /api/molecules/search/exact
 { "smiles": "CCO" }

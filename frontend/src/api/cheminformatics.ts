@@ -21,7 +21,7 @@ function apiUrl(path: string): string {
 function formatNetworkError(op: string, err: unknown): string {
   if (err instanceof TypeError) {
     const hint = import.meta.env.DEV
-      ? "Is the backend running on http://localhost:8000?"
+      ? "Start the backend: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000. Open the app at http://localhost:5173 (not 127.0.0.1) if CORS blocks."
       : "Redeploy Netlify after setting VITE_CHEMINFORMATICS_API_URL or the /api proxy in netlify.toml.";
     return `${op}: cannot reach API. ${hint}`;
   }
@@ -34,16 +34,29 @@ export interface Molecule {
   molecular_weight?: number | null;
   molecular_formula?: string | null;
   similarity?: number | null;
+  name?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+export interface MoleculeDetail extends Molecule {
+  has_structure_svg: boolean;
+}
+
+export interface ImportResult {
+  success_count: number;
+  failed_count: number;
+  errors: { index: number; reason: string }[];
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(apiUrl(`/api${path}`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    res = await fetch(apiUrl(`/api${path}`), init);
   } catch (e) {
     throw new Error(formatNetworkError("Request", e));
   }
@@ -59,24 +72,60 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-export async function listMolecules(limit = 500): Promise<Molecule[]> {
-  let res: Response;
-  try {
-    res = await fetch(apiUrl(`/api/molecules?limit=${limit}`));
-  } catch (e) {
-    throw new Error(formatNetworkError("See All", e));
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(
-      typeof err.detail === "string" ? err.detail : `List failed (${res.status})`
-    );
-  }
-  return res.json();
+async function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
-export async function saveMolecule(smiles: string): Promise<Molecule> {
-  return post<Molecule>("/molecules/save", { smiles });
+export function structureSvgUrl(moleculeId: string): string {
+  return apiUrl(`/api/molecules/${moleculeId}/structure.svg`);
+}
+
+export async function listMolecules(limit = 500): Promise<Molecule[]> {
+  return request<Molecule[]>(`/molecules?limit=${limit}`);
+}
+
+export async function getMolecule(id: string): Promise<MoleculeDetail> {
+  return request<MoleculeDetail>(`/molecules/${id}`);
+}
+
+export async function updateMolecule(
+  id: string,
+  fields: { name?: string | null; notes?: string | null }
+): Promise<Molecule> {
+  return request<Molecule>(`/molecules/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function deleteMolecule(id: string): Promise<void> {
+  await request<void>(`/molecules/${id}`, { method: "DELETE" });
+}
+
+export async function saveMolecule(
+  smiles: string,
+  options?: { molfile?: string; name?: string; notes?: string }
+): Promise<Molecule> {
+  return post<Molecule>("/molecules/save", {
+    smiles,
+    molfile: options?.molfile,
+    name: options?.name,
+    notes: options?.notes,
+  });
+}
+
+export async function importMolecules(file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return request<ImportResult>("/molecules/import", {
+    method: "POST",
+    body: form,
+  });
 }
 
 export async function exactSearch(smiles: string): Promise<Molecule | null> {

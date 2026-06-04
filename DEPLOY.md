@@ -54,7 +54,7 @@ git push -u origin main
 |------|-----|
 | `SUPABASE_URL` | `https://lgwofoudcmtnhrjnequv.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` 里的 `sb_secret_...` |
-| `CORS_ORIGINS` | 先 `http://localhost:5173`，Netlify 上线后再加站点 URL |
+| `CORS_ORIGINS` | `http://localhost:5173,https://你的站点.netlify.app`（多个用英文逗号；已支持 `*.netlify.app`） |
 
 保存后 **Manual Deploy** → **Clear build cache & deploy**。
 
@@ -115,7 +115,8 @@ https://你的站点.netlify.app,http://localhost:5173
 
 2. **Netlify** → **Deploys** → **Trigger deploy** → **Clear cache and deploy site**（若改过 API 地址）
 
-3. 用手机/别的电脑打开 Netlify 链接，试 **See All**、**Save Structure**
+3. 在 **Supabase SQL Editor** 运行 `supabase/migrations/002_phase1_5_molecule_fields.sql`（若尚未执行）
+4. 用手机/别的电脑打开 Netlify 链接，试 **See All**、**Save Structure**、**Import Excel**
 
 ---
 

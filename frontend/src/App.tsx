@@ -5,13 +5,28 @@ import {
   saveMolecule,
   similaritySearch,
   substructureSearch,
+  type ImportResult,
   type Molecule,
 } from "./api/cheminformatics";
 import ErrorBoundary from "./components/ErrorBoundary";
 import KetcherEditor, { type KetcherHandle } from "./components/KetcherEditor";
+import MoleculeDetailDrawer from "./components/MoleculeDetailDrawer";
+import MoleculeImport from "./components/MoleculeImport";
 import MoleculeTable from "./components/MoleculeTable";
 
 type SearchMode = "save" | "exact" | "substructure" | "similarity" | "browse";
+
+function upsertRow(rows: Molecule[], updated: Molecule): Molecule[] {
+  const i = rows.findIndex((r) => r.id === updated.id);
+  if (i < 0) return rows;
+  const next = [...rows];
+  next[i] = { ...next[i], ...updated };
+  return next;
+}
+
+function removeRow(rows: Molecule[], id: string): Molecule[] {
+  return rows.filter((r) => r.id !== id);
+}
 
 export default function App() {
   const [ketcher, setKetcher] = useState<KetcherHandle | null>(null);
@@ -27,6 +42,7 @@ export default function App() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [singleResult, setSingleResult] = useState<Molecule | null>(null);
   const [threshold, setThreshold] = useState(0.7);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
     setCatalogLoading(true);
@@ -87,7 +103,8 @@ export default function App() {
     run(async () => {
       if (!ketcher) throw new Error("Editor not ready");
       const smiles = await ketcher.getSmiles();
-      const saved = await saveMolecule(smiles);
+      const molfile = await ketcher.getMolfile();
+      const saved = await saveMolecule(smiles, { molfile });
       setSingleResult(saved);
       setResults([saved]);
       setStatus({
@@ -141,6 +158,38 @@ export default function App() {
       });
     });
 
+  const handleImported = useCallback(
+    async (result: ImportResult) => {
+      await refreshCatalog();
+      setMode("browse");
+      setResults([]);
+      setSingleResult(null);
+      const errPreview =
+        result.errors.length > 0
+          ? ` First error: ${result.errors[0].reason}`
+          : "";
+      setStatus({
+        type: result.success_count > 0 ? "success" : "info",
+        message: `Import: ${result.success_count} saved, ${result.failed_count} failed.${errPreview}`,
+      });
+    },
+    [refreshCatalog]
+  );
+
+  const handleRecordUpdated = useCallback((updated: Molecule) => {
+    setCatalog((c) => upsertRow(c, updated));
+    setResults((r) => upsertRow(r, updated));
+    if (singleResult?.id === updated.id) setSingleResult(updated);
+  }, [singleResult?.id]);
+
+  const handleRecordDeleted = useCallback((id: string) => {
+    setCatalog((c) => removeRow(c, id));
+    setResults((r) => removeRow(r, id));
+    if (singleResult?.id === id) setSingleResult(null);
+    setSelectedId(null);
+    setStatus({ type: "info", message: "Record deleted." });
+  }, [singleResult?.id]);
+
   const displayRows =
     mode === "browse"
       ? catalog
@@ -158,8 +207,8 @@ export default function App() {
       <header className="app-header">
         <h1>ISISlike — Chemical Inventory & ELN</h1>
         <p>
-          Phase 1: All structures pass through RDKit before Supabase. Frontend
-          never writes raw SMILES to the database.
+          Phase 1.5: Manage compound records — view, edit, delete, import, and
+          search via RDKit before Supabase.
         </p>
       </header>
 
@@ -287,14 +336,18 @@ export default function App() {
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel panel-results">
           <div className="panel-header">{resultsTitle}</div>
           <div className="panel-body">
             {catalogError && (
               <div className="status error">{catalogError}</div>
             )}
-            {mode !== "browse" && (
-              <div className="toolbar" style={{ marginTop: 0 }}>
+            <div className="toolbar" style={{ marginTop: 0 }}>
+              <MoleculeImport
+                onImported={(r) => void handleImported(r)}
+                disabled={catalogLoading}
+              />
+              {mode !== "browse" && (
                 <button
                   type="button"
                   className="secondary"
@@ -302,23 +355,32 @@ export default function App() {
                 >
                   See all registered ({catalog.length || "…"})
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             {mode === "browse" && catalogLoading && (
               <p className="empty">Loading structures…</p>
             )}
             <MoleculeTable
               rows={displayRows}
               showSimilarity={mode === "similarity"}
+              selectedId={selectedId}
+              onRowClick={(row) => setSelectedId(row.id)}
               emptyMessage={
                 mode === "browse"
-                  ? "No structures registered yet. Draw one and use Save Structure."
+                  ? "No structures registered yet. Draw one, import a file, or use Save Structure."
                   : "No results yet. Run a search or click See all registered."
               }
             />
           </div>
         </section>
       </div>
+
+      <MoleculeDetailDrawer
+        moleculeId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onUpdated={handleRecordUpdated}
+        onDeleted={handleRecordDeleted}
+      />
     </>
   );
 }

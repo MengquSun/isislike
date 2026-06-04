@@ -5,6 +5,7 @@ import "ketcher-react/dist/index.css";
 export interface KetcherHandle {
   getSmiles: () => Promise<string>;
   getSmarts: () => Promise<string>;
+  getMolfile: () => Promise<string>;
 }
 
 interface KetcherInstance {
@@ -78,6 +79,7 @@ export default function KetcherEditor({ onReady }: Props) {
               if (!molfile?.trim()) throw new Error("Draw a query structure first");
               return ketcher.getSmarts();
             },
+            getMolfile: () => ketcher.getMolfile(),
           });
         }}
       />
