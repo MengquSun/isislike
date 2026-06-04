@@ -272,11 +272,31 @@ tr.selected-row td {
 }
 
 .structure-preview-img,
+.structure-thumb-wrap {
+  line-height: 0;
+  flex-shrink: 0;
+}
+
 .structure-thumb {
   display: block;
   max-width: 100%;
   height: auto;
   object-fit: contain;
+}
+
+.structure-thumb-loading {
+  background: linear-gradient(90deg, #f0f2f5 25%, #e8ecf0 50%, #f0f2f5 75%);
+  background-size: 200% 100%;
+  animation: structure-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes structure-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .structure-thumb {

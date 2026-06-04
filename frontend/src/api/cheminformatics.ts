@@ -80,8 +80,17 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+/**
+ * Structure images must use same-origin /api on Netlify (proxied to Render).
+ * Direct Render URLs in <img> often 404 or fail when many load in parallel.
+ */
 export function structureSvgUrl(moleculeId: string): string {
-  return apiUrl(`/api/molecules/${moleculeId}/structure.svg`);
+  const id = encodeURIComponent(moleculeId);
+  const path = `/api/molecules/${id}/structure.svg`;
+  if (import.meta.env.PROD) {
+    return path;
+  }
+  return apiUrl(path);
 }
 
 export async function listMolecules(limit = 500): Promise<Molecule[]> {

@@ -12,10 +12,16 @@
   # Baked into the JS bundle at build time (optional if /api proxy below is used)
   VITE_CHEMINFORMATICS_API_URL = "https://isislike.onrender.com"
 
-# Proxy API to Render (same-origin /api → no CORS, works even if env var missing)
+# Proxy API to Render (same-origin /api → no CORS; structure.svg must not hit SPA)
 [[redirects]]
   from = "/api/*"
   to = "https://isislike.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/molecules/*/structure.svg"
+  to = "https://isislike.onrender.com/api/molecules/:splat/structure.svg"
   status = 200
   force = true
 

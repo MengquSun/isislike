@@ -284,4 +284,8 @@ async def get_structure_svg(molecule_id: str):
         except RDKitError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
