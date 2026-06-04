@@ -12,11 +12,20 @@ from app.models.schemas import FIELD_TYPES_MVP
 _MIGRATION_003_HINT = (
     "Run supabase/migrations/003_phase2a_dynamic_fields.sql in the Supabase SQL Editor."
 )
+_MIGRATION_004_HINT = (
+    "Run supabase/migrations/004_records_canonical_smiles_key.sql in the Supabase SQL Editor."
+)
 
-RECORD_SELECT = "id,database_id,molecule_id,created_at,updated_at"
+RECORD_SELECT = "id,database_id,molecule_id,canonical_smiles,created_at,updated_at"
 RECORD_WITH_VALUES_SELECT = (
     f"{RECORD_SELECT},"
     "record_values(id,field_id,text_value,number_value,date_value,structure_molecule_id,"
+    "field_definitions(id,name,field_type))"
+)
+RECORD_LINKED_SELECT = (
+    "id,database_id,molecule_id,canonical_smiles,"
+    "databases(id,name),"
+    "record_values(id,field_id,text_value,number_value,date_value,"
     "field_definitions(id,name,field_type))"
 )
 
@@ -29,9 +38,11 @@ def _check_response(resp: httpx.Response) -> None:
         "does not exist" in body.lower()
         or "relation" in body.lower()
         or "databases" in body.lower()
+        or "canonical_smiles" in body.lower()
     ):
+        hint = _MIGRATION_004_HINT if "canonical_smiles" in body.lower() else _MIGRATION_003_HINT
         raise RuntimeError(
-            f"Supabase schema missing Phase 2A tables. {_MIGRATION_003_HINT} "
+            f"Supabase schema missing Phase 2A tables/columns. {hint} "
             f"({body[:240]})"
         )
     raise RuntimeError(f"Supabase error ({resp.status_code}): {body[:500]}")
@@ -78,6 +89,37 @@ def _value_payload(
             "date_value": str(raw),
         }
     raise ValueError(f"Unsupported field type: {field_type}")
+
+
+def _flatten_linked_record_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a record row with nested databases + values for linked-record views."""
+    db = row.get("databases") or {}
+    if isinstance(db, list) and db:
+        db = db[0]
+    values_raw = row.get("record_values") or []
+    values: list[dict[str, Any]] = []
+    for rv in values_raw:
+        fd = rv.get("field_definitions") or {}
+        if isinstance(fd, list) and fd:
+            fd = fd[0]
+        values.append(
+            {
+                "field_id": rv.get("field_id"),
+                "field_name": fd.get("name"),
+                "field_type": fd.get("field_type"),
+                "text_value": rv.get("text_value"),
+                "number_value": rv.get("number_value"),
+                "date_value": rv.get("date_value"),
+            }
+        )
+    return {
+        "record_id": row["id"],
+        "database_id": row["database_id"],
+        "database_name": db.get("name") or "Database",
+        "canonical_smiles": row.get("canonical_smiles") or "",
+        "molecule_id": row.get("molecule_id"),
+        "values": values,
+    }
 
 
 def _flatten_record_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -380,18 +422,47 @@ async def _replace_record_values(
     await _insert_record_values(client, record_id, fields_by_id, values)
 
 
+async def fetch_records_by_molecule_ids(
+    molecule_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    if not molecule_ids:
+        return {}
+    id_filter = ",".join(molecule_ids)
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{_base()}/records",
+            headers=_headers(),
+            params={
+                "molecule_id": f"in.({id_filter})",
+                "select": RECORD_LINKED_SELECT,
+                "order": "updated_at.desc",
+            },
+        )
+        _check_response(resp)
+        grouped: dict[str, list[dict[str, Any]]] = {mid: [] for mid in molecule_ids}
+        for row in resp.json():
+            flat = _flatten_linked_record_row(dict(row))
+            mid = flat.get("molecule_id")
+            if mid and mid in grouped:
+                grouped[mid].append(flat)
+        return grouped
+
+
 async def insert_record(
     database_id: str,
     *,
-    molecule_id: str | None = None,
+    molecule_id: str,
+    canonical_smiles: str,
     values: dict[str, str | int | float | None],
 ) -> dict[str, Any]:
     fields = await list_field_definitions(database_id)
     fields_by_id = {f["id"]: f for f in fields}
 
-    payload: dict[str, Any] = {"database_id": database_id}
-    if molecule_id is not None:
-        payload["molecule_id"] = molecule_id
+    payload: dict[str, Any] = {
+        "database_id": database_id,
+        "molecule_id": molecule_id,
+        "canonical_smiles": canonical_smiles,
+    }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
@@ -414,18 +485,18 @@ async def update_record(
     record_id: str,
     *,
     molecule_id: str | None = None,
+    canonical_smiles: str | None = None,
     values: dict[str, str | int | float | None] | None = None,
-    clear_molecule: bool = False,
 ) -> dict[str, Any] | None:
     existing = await fetch_record(record_id)
     if not existing:
         return None
 
     patch: dict[str, Any] = {}
-    if clear_molecule:
-        patch["molecule_id"] = None
-    elif molecule_id is not None:
+    if molecule_id is not None:
         patch["molecule_id"] = molecule_id
+    if canonical_smiles is not None:
+        patch["canonical_smiles"] = canonical_smiles
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         if patch:

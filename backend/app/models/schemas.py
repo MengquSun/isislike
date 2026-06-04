@@ -26,6 +26,7 @@ class MoleculeResponse(BaseModel):
     notes: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    linked_database_records: list["LinkedDatabaseRecord"] = Field(default_factory=list)
 
 
 class MoleculeDetailResponse(MoleculeResponse):
@@ -118,8 +119,16 @@ class RecordValueResponse(BaseModel):
     date_value: str | None = None
 
 
+class LinkedDatabaseRecord(BaseModel):
+    record_id: str
+    database_id: str
+    database_name: str
+    canonical_smiles: str
+    values: list[RecordValueResponse] = Field(default_factory=list)
+
+
 class RecordCreate(BaseModel):
-    molecule_id: str | None = None
+    smiles: str = Field(..., min_length=1, description="Raw or canonical SMILES; resolved via RDKit")
     values: dict[str, str | int | float | None] = Field(
         default_factory=dict,
         description="Map of field_definition id -> value",
@@ -127,14 +136,28 @@ class RecordCreate(BaseModel):
 
 
 class RecordUpdate(BaseModel):
-    molecule_id: str | None = None
+    smiles: str | None = Field(default=None, min_length=1)
     values: dict[str, str | int | float | None] | None = None
 
 
 class RecordResponse(BaseModel):
     id: str
     database_id: str
-    molecule_id: str | None = None
+    molecule_id: str
+    canonical_smiles: str
     created_at: str | None = None
     updated_at: str | None = None
     values: list[RecordValueResponse] = Field(default_factory=list)
+
+
+class MoleculeIdsInput(BaseModel):
+    molecule_ids: list[str] = Field(default_factory=list, max_length=500)
+
+
+class LinkedRecordsByMolecule(BaseModel):
+    molecule_id: str
+    records: list[LinkedDatabaseRecord] = Field(default_factory=list)
+
+
+MoleculeResponse.model_rebuild()
+MoleculeDetailResponse.model_rebuild()

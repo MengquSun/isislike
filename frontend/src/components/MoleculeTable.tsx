@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { Molecule } from "../api/cheminformatics";
+import LinkedDatabaseRecords from "./LinkedDatabaseRecords";
 import StructureImage from "./StructureImage";
 
 interface Props {
@@ -106,6 +107,10 @@ export default function MoleculeTable({
                 )}
               </dl>
               <code className="molecule-card-smiles">{r.canonical_smiles}</code>
+              <LinkedDatabaseRecords
+                records={r.linked_database_records ?? []}
+                compact
+              />
             </div>
           </li>
         ))}

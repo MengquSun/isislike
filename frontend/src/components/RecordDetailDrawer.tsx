@@ -33,7 +33,7 @@ export default function RecordDetailDrawer({
   const [values, setValues] = useState<Record<string, string | number | null>>(
     {}
   );
-  const [moleculeId, setMoleculeId] = useState<string | null>(null);
+  const [smiles, setSmiles] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -61,10 +61,10 @@ export default function RecordDetailDrawer({
     if (!open) return;
     if (record && !isNew) {
       setValues(valuesMapFromRecord(record));
-      setMoleculeId(record.molecule_id ?? null);
+      setSmiles(record.canonical_smiles);
     } else {
       setValues({});
-      setMoleculeId(null);
+      setSmiles("");
     }
     setError(null);
     setStatus(null);
@@ -75,16 +75,19 @@ export default function RecordDetailDrawer({
     setError(null);
     setStatus(null);
     try {
+      if (!smiles.trim()) {
+        throw new Error("Canonical SMILES is required.");
+      }
       if (isNew) {
         const created = await createRecord(databaseId, {
-          molecule_id: moleculeId,
+          smiles: smiles.trim(),
           values,
         });
         setStatus("Created.");
         onSaved(created);
       } else if (record) {
         const updated = await updateRecord(databaseId, record.id, {
-          molecule_id: moleculeId,
+          smiles: smiles.trim(),
           values,
         });
         setStatus("Saved.");
@@ -137,9 +140,13 @@ export default function RecordDetailDrawer({
           {error && <div className="status error">{error}</div>}
           {status && <div className="status success">{status}</div>}
 
-          {!loading && moleculeId && (
+          {!loading && record?.molecule_id && (
             <div className="structure-preview">
-              <StructureImage moleculeId={moleculeId} width={280} height={180} />
+              <StructureImage
+                moleculeId={record.molecule_id}
+                width={280}
+                height={180}
+              />
             </div>
           )}
 
@@ -153,9 +160,9 @@ export default function RecordDetailDrawer({
             <DynamicRecordForm
               fields={fields}
               values={values}
-              moleculeId={moleculeId}
+              smiles={smiles}
               onValuesChange={setValues}
-              onMoleculeIdChange={setMoleculeId}
+              onSmilesChange={setSmiles}
             />
           )}
 
@@ -163,7 +170,7 @@ export default function RecordDetailDrawer({
             <button
               type="button"
               className="primary"
-              disabled={saving || loading || fields.length === 0}
+              disabled={saving || loading || fields.length === 0 || !smiles.trim()}
               onClick={() => void handleSave()}
             >
               {saving ? "Saving…" : isNew ? "Create" : "Save"}

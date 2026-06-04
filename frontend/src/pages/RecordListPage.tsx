@@ -127,6 +127,7 @@ export default function RecordListPage() {
                 <thead>
                   <tr>
                     <th>Structure</th>
+                    <th>Canonical SMILES</th>
                     {fields.map((f) => (
                       <th key={f.id}>{f.name}</th>
                     ))}
@@ -153,6 +154,11 @@ export default function RecordListPage() {
                         ) : (
                           "—"
                         )}
+                      </td>
+                      <td>
+                        <code className="record-smiles-cell">
+                          {record.canonical_smiles}
+                        </code>
                       </td>
                       {fields.map((f) => (
                         <td key={f.id}>{valueFor(record, f.id)}</td>

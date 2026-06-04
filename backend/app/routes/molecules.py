@@ -13,7 +13,7 @@ from app.models.schemas import (
     SmilesInput,
     UpdateMoleculeRequest,
 )
-from app.services import excel_import, rdkit_service, supabase_client
+from app.services import excel_import, molecule_links, rdkit_service, supabase_client
 from app.services.rdkit_service import RDKitError
 
 router = APIRouter(prefix="/molecules", tags=["molecules"])
@@ -46,7 +46,8 @@ async def list_molecules(limit: int = 500):
     """List all registered molecules (newest first)."""
     try:
         rows = await supabase_client.list_molecules(limit=min(limit, 1000))
-        return [_row_to_response(r) for r in rows]
+        responses = [_row_to_response(r) for r in rows]
+        return await molecule_links.attach_linked_database_records(responses)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -80,7 +81,10 @@ async def save_molecule(body: SaveMoleculeRequest):
         row = await supabase_client.insert_molecule(
             props, name=body.name, notes=body.notes
         )
-        return _row_to_response(row)
+        attached = await molecule_links.attach_linked_database_records(
+            [_row_to_response(row)]
+        )
+        return attached[0]
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ValueError as e:
@@ -176,7 +180,10 @@ async def exact_search(body: SmilesInput):
         )
         if row is None:
             return None
-        return _row_to_response(row)
+        attached = await molecule_links.attach_linked_database_records(
+            [_row_to_response(row)]
+        )
+        return attached[0]
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -197,7 +204,7 @@ async def substructure_search(body: SmartsInput):
                 continue
             if rdkit_service.has_substructure_match(smiles, query_smarts):
                 results.append(_row_to_response(row))
-        return results
+        return await molecule_links.attach_linked_database_records(results)
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -214,10 +221,11 @@ async def similarity_search(body: SimilaritySearchRequest):
             match_threshold=body.match_threshold,
             match_count=body.match_count,
         )
-        return [
+        responses = [
             _row_to_response(r, similarity=r.get("similarity"))
             for r in rows
         ]
+        return await molecule_links.attach_linked_database_records(responses)
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -233,7 +241,15 @@ async def get_molecule(molecule_id: str):
         raise HTTPException(status_code=503, detail=str(e)) from e
     if row is None:
         raise HTTPException(status_code=404, detail="Molecule not found")
-    return _row_to_detail(row)
+    detail = _row_to_detail(row)
+    attached = await molecule_links.attach_linked_database_records(
+        [MoleculeResponse(**detail.model_dump(exclude={"has_structure_svg"}))]
+    )
+    base = attached[0]
+    return MoleculeDetailResponse(
+        **base.model_dump(),
+        has_structure_svg=detail.has_structure_svg,
+    )
 
 
 @router.patch("/{molecule_id}", response_model=MoleculeResponse)

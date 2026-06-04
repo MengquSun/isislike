@@ -5,17 +5,17 @@ import type { FieldDefinition } from "../api/databases";
 interface Props {
   fields: FieldDefinition[];
   values: Record<string, string | number | null>;
-  moleculeId: string | null;
+  smiles: string;
   onValuesChange: (values: Record<string, string | number | null>) => void;
-  onMoleculeIdChange: (id: string | null) => void;
+  onSmilesChange: (smiles: string) => void;
 }
 
 export default function DynamicRecordForm({
   fields,
   values,
-  moleculeId,
+  smiles,
   onValuesChange,
-  onMoleculeIdChange,
+  onSmilesChange,
 }: Props) {
   const [molecules, setMolecules] = useState<Molecule[]>([]);
 
@@ -27,20 +27,37 @@ export default function DynamicRecordForm({
     onValuesChange({ ...values, [fieldId]: value });
   };
 
+  const pickMolecule = (m: Molecule) => {
+    onSmilesChange(m.canonical_smiles);
+  };
+
   return (
     <div className="detail-form">
-      <label htmlFor="record-molecule">Primary structure (optional)</label>
+      <label htmlFor="record-smiles">
+        Canonical SMILES <span className="required-mark">*</span>
+      </label>
+      <input
+        id="record-smiles"
+        type="text"
+        required
+        value={smiles}
+        onChange={(e) => onSmilesChange(e.target.value)}
+        placeholder="Must match a structure saved on Structures page"
+      />
+      <label htmlFor="record-molecule-pick">Pick from catalog</label>
       <select
-        id="record-molecule"
-        value={moleculeId ?? ""}
-        onChange={(e) =>
-          onMoleculeIdChange(e.target.value ? e.target.value : null)
-        }
+        id="record-molecule-pick"
+        value=""
+        onChange={(e) => {
+          const m = molecules.find((x) => x.id === e.target.value);
+          if (m) pickMolecule(m);
+          e.target.value = "";
+        }}
       >
-        <option value="">— None —</option>
+        <option value="">— Select registered structure —</option>
         {molecules.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.name || m.canonical_smiles.slice(0, 48)}
+            {m.name || m.canonical_smiles.slice(0, 56)}
           </option>
         ))}
       </select>

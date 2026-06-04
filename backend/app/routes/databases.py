@@ -12,7 +12,8 @@ from app.models.schemas import (
     RecordUpdate,
     RecordValueResponse,
 )
-from app.services import database_client, supabase_client
+from app.services import database_client, rdkit_service, supabase_client
+from app.services.rdkit_service import RDKitError
 
 router = APIRouter(prefix="/databases", tags=["databases"])
 
@@ -53,7 +54,8 @@ def _record_row(row: dict) -> RecordResponse:
     return RecordResponse(
         id=row["id"],
         database_id=row["database_id"],
-        molecule_id=row.get("molecule_id"),
+        molecule_id=row["molecule_id"],
+        canonical_smiles=row.get("canonical_smiles") or "",
         created_at=row.get("created_at"),
         updated_at=row.get("updated_at"),
         values=values,
@@ -74,12 +76,23 @@ async def _require_field(database_id: str, field_id: str) -> dict:
     return row
 
 
-async def _validate_molecule_id(molecule_id: str | None) -> None:
-    if molecule_id is None:
-        return
-    mol = await supabase_client.fetch_molecule_by_id(molecule_id)
-    if not mol:
-        raise HTTPException(status_code=400, detail="molecule_id not found")
+async def _resolve_smiles_to_molecule(smiles: str) -> tuple[str, str]:
+    try:
+        props = rdkit_service.canonicalize_smiles(smiles.strip())
+    except RDKitError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    row = await supabase_client.fetch_molecule_by_canonical_smiles(
+        props.canonical_smiles
+    )
+    if not row:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No registered molecule for this canonical SMILES. "
+                "Save the structure on the Structures page first."
+            ),
+        )
+    return row["id"], props.canonical_smiles
 
 
 @router.get("", response_model=list[DatabaseResponse])
@@ -228,11 +241,12 @@ async def list_records(database_id: str, limit: int = 500):
 )
 async def create_record(database_id: str, body: RecordCreate):
     await _require_database(database_id)
-    await _validate_molecule_id(body.molecule_id)
+    molecule_id, canonical_smiles = await _resolve_smiles_to_molecule(body.smiles)
     try:
         row = await database_client.insert_record(
             database_id,
-            molecule_id=body.molecule_id,
+            molecule_id=molecule_id,
+            canonical_smiles=canonical_smiles,
             values=body.values,
         )
         return _record_row(row)
@@ -263,18 +277,20 @@ async def get_record(database_id: str, record_id: str):
 )
 async def patch_record(database_id: str, record_id: str, body: RecordUpdate):
     await _require_database(database_id)
-    await _validate_molecule_id(body.molecule_id)
+    molecule_id: str | None = None
+    canonical_smiles: str | None = None
+    if body.smiles is not None:
+        molecule_id, canonical_smiles = await _resolve_smiles_to_molecule(body.smiles)
     try:
         existing = await database_client.fetch_record(record_id)
         if not existing or existing.get("database_id") != database_id:
             raise HTTPException(status_code=404, detail="Record not found")
 
-        clear_mol = "molecule_id" in body.model_fields_set and body.molecule_id is None
         row = await database_client.update_record(
             record_id,
-            molecule_id=body.molecule_id,
+            molecule_id=molecule_id,
+            canonical_smiles=canonical_smiles,
             values=body.values,
-            clear_molecule=clear_mol,
         )
         if not row:
             raise HTTPException(status_code=404, detail="Record not found")

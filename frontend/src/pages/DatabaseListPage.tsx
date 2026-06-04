@@ -54,7 +54,9 @@ export default function DatabaseListPage() {
         <div className="panel-body">
           <p className="browse-hint">
             Create a database template, define fields, then add records. Each record
-            can link a primary structure from the molecule catalog.
+            requires a canonical SMILES that matches a structure saved on the
+            Structures page; the same structure may appear in many records.
+            Search results show linked database fields.
           </p>
 
           <form className="inline-form" onSubmit={(e) => void handleCreate(e)}>

@@ -39,14 +39,14 @@ UI: click a results row → right drawer (structure, SMILES, MW, formula, name, 
 
 ## Phase 2A — Dynamic fields MVP
 
-After Phase 1.5, run **`supabase/migrations/003_phase2a_dynamic_fields.sql`** in the Supabase SQL Editor (`databases`, `field_definitions`, `records`, `record_values`).
+After Phase 1.5, run **`supabase/migrations/003_phase2a_dynamic_fields.sql`**, **`004_records_canonical_smiles_key.sql`**, and **`005_records_multiple_per_structure.sql`** in the Supabase SQL Editor (`databases`, `field_definitions`, `records` with `canonical_smiles`, `record_values`).
 
 | Area | Routes / pages |
 |------|----------------|
 | API | `GET/POST /api/databases`, fields under `/api/databases/{id}/fields`, records under `/api/databases/{id}/records` |
 | UI | `/databases`, `/databases/:id/fields`, `/databases/:id/records` |
 
-Field types (MVP): `text`, `number`, `date`, `select`. Records may set optional `molecule_id` for a primary structure (reuses Phase 1 search/catalog).
+Field types (MVP): `text`, `number`, `date`, `select`. Each record **requires** a canonical SMILES matching a saved molecule; multiple records per structure in the same database are allowed. Molecule search/list responses include `linked_database_records` with dynamic field values.
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ cd "/Users/mengqusun/Desktop/澳赛诺/isislike"
 1. Sidebar → **SQL Editor** → **New query**
 2. Open `supabase/migrations/001_phase1_molecules.sql` locally, copy all, paste, **Run**
 3. Run `supabase/migrations/002_phase1_5_molecule_fields.sql` the same way (Phase 1.5)
-4. Run `supabase/migrations/003_phase2a_dynamic_fields.sql` (Phase 2A)
+4. Run `supabase/migrations/003_phase2a_dynamic_fields.sql`, `004_records_canonical_smiles_key.sql`, and `005_records_multiple_per_structure.sql` (Phase 2A)
 4. Expect: “Success” (no rows returned is normal)
 
 **C. Verify**

@@ -72,10 +72,19 @@ export interface RecordValue {
   date_value?: string | null;
 }
 
+export interface LinkedDatabaseRecord {
+  record_id: string;
+  database_id: string;
+  database_name: string;
+  canonical_smiles: string;
+  values: RecordValue[];
+}
+
 export interface DatabaseRecord {
   id: string;
   database_id: string;
-  molecule_id?: string | null;
+  molecule_id: string;
+  canonical_smiles: string;
   created_at?: string | null;
   updated_at?: string | null;
   values: RecordValue[];
@@ -150,7 +159,7 @@ export async function listRecords(
 export async function createRecord(
   databaseId: string,
   data: {
-    molecule_id?: string | null;
+    smiles: string;
     values: Record<string, string | number | null>;
   }
 ): Promise<DatabaseRecord> {
@@ -161,7 +170,7 @@ export async function updateRecord(
   databaseId: string,
   recordId: string,
   data: {
-    molecule_id?: string | null;
+    smiles?: string;
     values?: Record<string, string | number | null>;
   }
 ): Promise<DatabaseRecord> {
