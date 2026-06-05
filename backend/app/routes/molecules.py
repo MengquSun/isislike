@@ -5,6 +5,7 @@ from app.models.schemas import (
     CanonicalizeResponse,
     ImportErrorItem,
     ImportResponse,
+    MoleculeDatabaseRecordResponse,
     MoleculeDetailResponse,
     MoleculeResponse,
     SaveMoleculeRequest,
@@ -43,11 +44,10 @@ def _row_to_detail(row: dict) -> MoleculeDetailResponse:
 
 @router.get("", response_model=list[MoleculeResponse])
 async def list_molecules(limit: int = 500):
-    """List all registered molecules (newest first)."""
+    """List registered molecules (compound preview only; no database records)."""
     try:
         rows = await supabase_client.list_molecules(limit=min(limit, 1000))
-        responses = [_row_to_response(r) for r in rows]
-        return await molecule_links.attach_linked_database_records(responses)
+        return [_row_to_response(r) for r in rows]
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -81,10 +81,7 @@ async def save_molecule(body: SaveMoleculeRequest):
         row = await supabase_client.insert_molecule(
             props, name=body.name, notes=body.notes
         )
-        attached = await molecule_links.attach_linked_database_records(
-            [_row_to_response(row)]
-        )
-        return attached[0]
+        return _row_to_response(row)
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ValueError as e:
@@ -181,10 +178,7 @@ async def exact_search(body: SmilesInput):
         )
         if row is None:
             return None
-        attached = await molecule_links.attach_linked_database_records(
-            [_row_to_response(row)]
-        )
-        return attached[0]
+        return _row_to_response(row)
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -205,7 +199,7 @@ async def substructure_search(body: SmartsInput):
                 continue
             if rdkit_service.has_substructure_match(smiles, query_smarts):
                 results.append(_row_to_response(row))
-        return await molecule_links.attach_linked_database_records(results)
+        return results
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -226,7 +220,7 @@ async def similarity_search(body: SimilaritySearchRequest):
             _row_to_response(r, similarity=r.get("similarity"))
             for r in rows
         ]
-        return await molecule_links.attach_linked_database_records(responses)
+        return responses
     except RDKitError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -243,14 +237,39 @@ async def get_molecule(molecule_id: str):
     if row is None:
         raise HTTPException(status_code=404, detail="Molecule not found")
     detail = _row_to_detail(row)
-    attached = await molecule_links.attach_linked_database_records(
-        [MoleculeResponse(**detail.model_dump(exclude={"has_structure_svg"}))]
-    )
-    base = attached[0]
-    return MoleculeDetailResponse(
-        **base.model_dump(),
-        has_structure_svg=detail.has_structure_svg,
-    )
+    return detail
+
+
+@router.get(
+    "/{molecule_id}/database-records",
+    response_model=list[MoleculeDatabaseRecordResponse],
+)
+async def list_molecule_database_records(
+    molecule_id: str,
+    source_database: str | None = None,
+    field_name: str | None = None,
+    keyword: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    """Database records linked to a molecule, with optional filters."""
+    try:
+        row = await supabase_client.fetch_molecule_by_id(molecule_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    if row is None:
+        raise HTTPException(status_code=404, detail="Molecule not found")
+    try:
+        return await molecule_links.fetch_molecule_database_records(
+            molecule_id,
+            source_database=source_database,
+            field_name=field_name,
+            keyword=keyword,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.patch("/{molecule_id}", response_model=MoleculeResponse)

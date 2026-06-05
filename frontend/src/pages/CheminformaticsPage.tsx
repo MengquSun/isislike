@@ -8,8 +8,10 @@ import {
   type ImportResult,
   type Molecule,
 } from "../api/cheminformatics";
+import { fetchExportConfig } from "../api/export";
 import ErrorBoundary from "../components/ErrorBoundary";
 import KetcherEditor, { type KetcherHandle } from "../components/KetcherEditor";
+import ExportModal from "../components/ExportModal";
 import MoleculeDetailDrawer from "../components/MoleculeDetailDrawer";
 import MoleculeImport from "../components/MoleculeImport";
 import MoleculeTable from "../components/MoleculeTable";
@@ -43,6 +45,8 @@ export default function CheminformaticsPage() {
   const [singleResult, setSingleResult] = useState<Molecule | null>(null);
   const [threshold, setThreshold] = useState(0.7);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportEnabled, setExportEnabled] = useState(false);
 
   const refreshCatalog = useCallback(async () => {
     setCatalogLoading(true);
@@ -78,6 +82,10 @@ export default function CheminformaticsPage() {
   useEffect(() => {
     void refreshCatalog();
   }, [refreshCatalog]);
+
+  useEffect(() => {
+    void fetchExportConfig().then((c) => setExportEnabled(c.enabled));
+  }, []);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {
@@ -199,7 +207,7 @@ export default function CheminformaticsPage() {
 
   const resultsTitle =
     mode === "browse"
-      ? `All registered structures (${catalog.length})`
+      ? `See All Registered (${catalog.length})`
       : "Results";
 
   return (
@@ -339,6 +347,15 @@ export default function CheminformaticsPage() {
                 onImported={(r) => void handleImported(r)}
                 disabled={catalogLoading}
               />
+              {exportEnabled && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setExportOpen(true)}
+                >
+                  Export
+                </button>
+              )}
               {mode !== "browse" && (
                 <button
                   type="button"
@@ -355,8 +372,9 @@ export default function CheminformaticsPage() {
             <MoleculeTable
               rows={displayRows}
               showSimilarity={mode === "similarity"}
+              preview={mode === "browse"}
               selectedId={selectedId}
-              onRowClick={(row) => setSelectedId(row.id)}
+              onRowClick={mode === "browse" ? undefined : (row) => setSelectedId(row.id)}
               emptyMessage={
                 mode === "browse"
                   ? "No structures registered yet. Draw one, import a file, or use Save Structure."
@@ -373,6 +391,8 @@ export default function CheminformaticsPage() {
         onUpdated={handleRecordUpdated}
         onDeleted={handleRecordDeleted}
       />
+
+      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
     </>
   );
 }

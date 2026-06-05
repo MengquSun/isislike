@@ -77,7 +77,27 @@ export interface LinkedDatabaseRecord {
   database_id: string;
   database_name: string;
   canonical_smiles: string;
+  created_at?: string | null;
+  updated_at?: string | null;
   values: RecordValue[];
+}
+
+export interface MoleculeDatabaseRecord {
+  id: string;
+  molecule_id: string;
+  source_database: string;
+  database_id: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  values: RecordValue[];
+}
+
+export interface MoleculeDatabaseRecordFilters {
+  source_database?: string;
+  field_name?: string;
+  keyword?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface DatabaseRecord {

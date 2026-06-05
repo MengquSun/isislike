@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routes import databases, molecules
+from app.routes import databases, export, molecules
 
 app = FastAPI(
     title="ISISlike Cheminformatics API",
@@ -66,6 +66,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(molecules.router, prefix="/api")
 app.include_router(databases.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
 
 
 @app.get("/health")

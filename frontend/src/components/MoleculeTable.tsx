@@ -1,19 +1,52 @@
+import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { Molecule } from "../api/cheminformatics";
-import LinkedDatabaseRecords from "./LinkedDatabaseRecords";
 import StructureImage from "./StructureImage";
 
 interface Props {
   rows: Molecule[];
   showSimilarity?: boolean;
+  preview?: boolean;
   emptyMessage?: string;
   onRowClick?: (row: Molecule) => void;
   selectedId?: string | null;
 }
 
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return iso;
+  }
+}
+
+function compoundLabel(row: Molecule): string {
+  return row.name?.trim() || "Unnamed compound";
+}
+
+function CompoundDetailLink({
+  row,
+  className = "compound-name-link",
+}: {
+  row: Molecule;
+  className?: string;
+}) {
+  return (
+    <Link
+      to={`/compounds/${row.id}`}
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {compoundLabel(row)}
+    </Link>
+  );
+}
+
 export default function MoleculeTable({
   rows,
   showSimilarity,
+  preview = false,
   emptyMessage = "No results yet.",
   onRowClick,
   selectedId,
@@ -26,6 +59,8 @@ export default function MoleculeTable({
       "Mol. Weight": r.molecular_weight ?? "",
       Formula: r.molecular_formula ?? "",
       Notes: r.notes ?? "",
+      Created: r.created_at ?? "",
+      Updated: r.updated_at ?? "",
       ...(showSimilarity ? { Similarity: r.similarity ?? "" } : {}),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -38,13 +73,122 @@ export default function MoleculeTable({
     return <p className="empty">{emptyMessage}</p>;
   }
 
+  if (preview) {
+    return (
+      <>
+        <div className="toolbar" style={{ marginTop: 0, marginBottom: "0.5rem" }}>
+          <button type="button" className="secondary" onClick={exportExcel}>
+            Export to Excel
+          </button>
+          <span className="toolbar-meta">
+            {rows.length} compound{rows.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="table-scroll compound-preview-table-wrap">
+          <table className="compound-preview-table">
+            <thead>
+              <tr>
+                <th>Structure</th>
+                <th>Name</th>
+                <th>Formula</th>
+                <th>MW</th>
+                <th>Canonical SMILES</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <StructureImage
+                      moleculeId={r.id}
+                      alt={r.name?.trim() || r.canonical_smiles}
+                      width={80}
+                      height={56}
+                    />
+                  </td>
+                  <td>
+                    <CompoundDetailLink row={r} />
+                  </td>
+                  <td>{r.molecular_formula ?? "—"}</td>
+                  <td>
+                    {r.molecular_weight != null
+                      ? r.molecular_weight.toFixed(2)
+                      : "—"}
+                  </td>
+                  <td>
+                    <code className="record-smiles-cell">{r.canonical_smiles}</code>
+                  </td>
+                  <td>{formatDate(r.created_at)}</td>
+                  <td>{formatDate(r.updated_at)}</td>
+                  <td>{r.notes?.trim() || "—"}</td>
+                  <td>
+                    <Link
+                      to={`/compounds/${r.id}`}
+                      className="secondary table-action-link"
+                    >
+                      Details →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="compound-preview-cards">
+          {rows.map((r) => (
+            <li key={r.id} className="compound-preview-card">
+              <div className="compound-preview-card-top">
+                <StructureImage
+                  moleculeId={r.id}
+                  alt={r.name?.trim() || r.canonical_smiles}
+                  width={72}
+                  height={52}
+                />
+                <div>
+                  <div className="compound-preview-card-name">
+                    <CompoundDetailLink row={r} />
+                  </div>
+                  <div className="compound-preview-card-meta">
+                    {r.molecular_formula ?? "—"} ·{" "}
+                    {r.molecular_weight != null
+                      ? r.molecular_weight.toFixed(2)
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+              <code className="compound-preview-card-smiles">{r.canonical_smiles}</code>
+              {r.notes?.trim() && (
+                <p className="compound-preview-card-notes">{r.notes.trim()}</p>
+              )}
+              <div className="compound-preview-card-footer">
+                <span>
+                  Updated {formatDate(r.updated_at)}
+                </span>
+                <Link
+                  to={`/compounds/${r.id}`}
+                  className="secondary table-action-link"
+                >
+                  Details →
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="toolbar" style={{ marginTop: 0, marginBottom: "0.5rem" }}>
         <button type="button" className="secondary" onClick={exportExcel}>
           Export to Excel
         </button>
-        <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+        <span className="toolbar-meta">
           {rows.length} result{rows.length !== 1 ? "s" : ""}
           {onRowClick ? " · click a row for details" : ""}
         </span>
@@ -80,7 +224,7 @@ export default function MoleculeTable({
             </div>
             <div className="molecule-card-body">
               <div className="molecule-card-title">
-                {r.name?.trim() || "Unnamed compound"}
+                <CompoundDetailLink row={r} />
               </div>
               <dl className="molecule-card-meta">
                 <div>
@@ -107,10 +251,15 @@ export default function MoleculeTable({
                 )}
               </dl>
               <code className="molecule-card-smiles">{r.canonical_smiles}</code>
-              <LinkedDatabaseRecords
-                records={r.linked_database_records ?? []}
-                compact
-              />
+              <div className="molecule-card-actions">
+                <Link
+                  to={`/compounds/${r.id}`}
+                  className="table-action-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View details →
+                </Link>
+              </div>
             </div>
           </li>
         ))}

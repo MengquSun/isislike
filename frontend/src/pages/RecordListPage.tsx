@@ -9,6 +9,8 @@ import {
   type DatabaseRecord,
   type FieldDefinition,
 } from "../api/databases";
+import { fetchExportConfig } from "../api/export";
+import ExportModal from "../components/ExportModal";
 import RecordDetailDrawer from "../components/RecordDetailDrawer";
 import StructureImage from "../components/StructureImage";
 
@@ -21,6 +23,8 @@ export default function RecordListPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DatabaseRecord | null>(null);
   const [creating, setCreating] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportEnabled, setExportEnabled] = useState(false);
 
   const load = useCallback(async () => {
     if (!databaseId) return;
@@ -45,6 +49,10 @@ export default function RecordListPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void fetchExportConfig().then((c) => setExportEnabled(c.enabled));
+  }, []);
 
   const valueFor = (record: DatabaseRecord, fieldId: string) => {
     const v = record.values.find((x) => x.field_id === fieldId);
@@ -95,17 +103,28 @@ export default function RecordListPage() {
       <section className="panel">
         <div className="panel-header">
           Records
-          <button
-            type="button"
-            className="primary header-action"
-            disabled={fields.length === 0}
-            onClick={() => {
-              setCreating(true);
-              setSelected(null);
-            }}
-          >
-            New record
-          </button>
+          <span style={{ display: "flex", gap: "0.5rem" }}>
+            {exportEnabled && (
+              <button
+                type="button"
+                className="secondary header-action"
+                onClick={() => setExportOpen(true)}
+              >
+                Export
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary header-action"
+              disabled={fields.length === 0}
+              onClick={() => {
+                setCreating(true);
+                setSelected(null);
+              }}
+            >
+              New record
+            </button>
+          </span>
         </div>
         <div className="panel-body">
           {fields.length === 0 && !loading && (
@@ -188,6 +207,8 @@ export default function RecordListPage() {
         onSaved={handleSaved}
         onDeleted={handleDeleted}
       />
+
+      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
     </main>
   );
 }

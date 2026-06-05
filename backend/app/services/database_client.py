@@ -23,7 +23,7 @@ RECORD_WITH_VALUES_SELECT = (
     "field_definitions(id,name,field_type))"
 )
 RECORD_LINKED_SELECT = (
-    "id,database_id,molecule_id,canonical_smiles,"
+    "id,database_id,molecule_id,canonical_smiles,created_at,updated_at,"
     "databases(id,name),"
     "record_values(id,field_id,text_value,number_value,date_value,"
     "field_definitions(id,name,field_type))"
@@ -118,6 +118,8 @@ def _flatten_linked_record_row(row: dict[str, Any]) -> dict[str, Any]:
         "database_name": db.get("name") or "Database",
         "canonical_smiles": row.get("canonical_smiles") or "",
         "molecule_id": row.get("molecule_id"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
         "values": values,
     }
 
@@ -227,6 +229,21 @@ async def delete_database(database_id: str) -> bool:
 
 
 # --- field_definitions ---
+
+
+async def list_all_field_definitions() -> list[dict[str, Any]]:
+    """All field definitions across databases (for export column ordering)."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(
+            f"{_base()}/field_definitions",
+            headers=_headers(),
+            params={
+                "select": "id,database_id,name,sort_order",
+                "order": "sort_order.asc,name.asc",
+            },
+        )
+        _check_response(resp)
+        return resp.json()
 
 
 async def list_field_definitions(database_id: str) -> list[dict[str, Any]]:
@@ -420,6 +437,102 @@ async def _replace_record_values(
     )
     _check_response(del_resp)
     await _insert_record_values(client, record_id, fields_by_id, values)
+
+
+def _record_value_text(v: dict[str, Any]) -> str:
+    if v.get("text_value") is not None:
+        return str(v["text_value"])
+    if v.get("number_value") is not None:
+        return str(v["number_value"])
+    if v.get("date_value") is not None:
+        return str(v["date_value"])
+    return ""
+
+
+def _matches_record_filters(
+    rec: dict[str, Any],
+    *,
+    source_database: str | None,
+    field_name: str | None,
+    keyword: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> bool:
+    db_name = (rec.get("database_name") or "").lower()
+    if source_database and source_database.lower() not in db_name:
+        return False
+
+    values = rec.get("values") or []
+    if field_name:
+        fn_lower = field_name.lower()
+        if not any((v.get("field_name") or "").lower() == fn_lower for v in values):
+            return False
+
+    if keyword:
+        kw = keyword.lower()
+        haystack = " ".join(
+            [
+                rec.get("database_name") or "",
+                rec.get("canonical_smiles") or "",
+                *(
+                    f"{v.get('field_name') or ''} {_record_value_text(v)}"
+                    for v in values
+                ),
+            ]
+        ).lower()
+        if kw not in haystack:
+            return False
+
+    updated = rec.get("updated_at") or rec.get("created_at") or ""
+    date_from_norm = date_from
+    date_to_norm = date_to
+    if date_from and "T" not in date_from:
+        date_from_norm = f"{date_from.strip()}T00:00:00"
+    if date_to and "T" not in date_to:
+        date_to_norm = f"{date_to.strip()}T23:59:59"
+    if date_from_norm and updated and updated < date_from_norm:
+        return False
+    if date_to_norm and updated and updated > date_to_norm:
+        return False
+
+    return True
+
+
+async def fetch_records_for_molecule(
+    molecule_id: str,
+    *,
+    source_database: str | None = None,
+    field_name: str | None = None,
+    keyword: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[dict[str, Any]]:
+    """All database records for one molecule, with optional client-side filters."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{_base()}/records",
+            headers=_headers(),
+            params={
+                "molecule_id": f"eq.{molecule_id}",
+                "select": RECORD_LINKED_SELECT,
+                "order": "updated_at.desc",
+            },
+        )
+        _check_response(resp)
+        records = [_flatten_linked_record_row(dict(row)) for row in resp.json()]
+
+    return [
+        rec
+        for rec in records
+        if _matches_record_filters(
+            rec,
+            source_database=source_database,
+            field_name=field_name,
+            keyword=keyword,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    ]
 
 
 async def fetch_records_by_molecule_ids(

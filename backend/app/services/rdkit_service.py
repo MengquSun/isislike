@@ -71,6 +71,29 @@ def mol_to_svg(mol: Chem.Mol, width: int = SVG_WIDTH, height: int = SVG_HEIGHT) 
     return drawer.GetDrawingText()
 
 
+def mol_to_png_bytes(
+    mol: Chem.Mol,
+    *,
+    width: int = 280,
+    height: int = 210,
+) -> bytes:
+    from rdkit.Chem import Draw
+
+    AllChem.Compute2DCoords(mol)
+    img = Draw.MolToImage(mol, size=(width, height))
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def structure_png_from_smiles(canonical_smiles: str) -> bytes | None:
+    try:
+        mol = _mol_from_smiles(canonical_smiles)
+        return mol_to_png_bytes(mol)
+    except RDKitError:
+        return None
+
+
 def canonicalize_smiles(raw_smiles: str, molfile: str | None = None) -> MoleculeProperties:
     mol = _mol_from_smiles(raw_smiles)
     Chem.SanitizeMol(mol)

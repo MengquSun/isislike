@@ -164,6 +164,60 @@ async def delete_molecule(molecule_id: str) -> bool:
         return True
 
 
+async def search_molecules(
+    *,
+    canonical_smiles: str | None = None,
+    molecular_formula: str | None = None,
+    name: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """Filter molecules by exact SMILES/formula and partial name (ilike)."""
+    params: dict[str, str] = {
+        "select": MOLECULE_LIST_SELECT,
+        "order": "created_at.desc",
+        "limit": str(limit),
+    }
+    if canonical_smiles:
+        params["canonical_smiles"] = f"eq.{canonical_smiles}"
+    if molecular_formula:
+        params["molecular_formula"] = f"eq.{molecular_formula}"
+    if name:
+        params["name"] = f"ilike.*{name}*"
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(
+            f"{_base()}/molecules",
+            headers=_headers(),
+            params=params,
+        )
+        _check_response(resp)
+        return resp.json()
+
+
+async def fetch_molecules_by_ids(
+    molecule_ids: list[str],
+    *,
+    include_structure: bool = False,
+) -> list[dict[str, Any]]:
+    if not molecule_ids:
+        return []
+    id_filter = ",".join(molecule_ids)
+    select = MOLECULE_DETAIL_SELECT if include_structure else MOLECULE_LIST_SELECT
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(
+            f"{_base()}/molecules",
+            headers=_headers(),
+            params={
+                "id": f"in.({id_filter})",
+                "select": select,
+            },
+        )
+        _check_response(resp)
+        rows = resp.json()
+        order = {mid: i for i, mid in enumerate(molecule_ids)}
+        return sorted(rows, key=lambda r: order.get(r["id"], len(molecule_ids)))
+
+
 async def list_molecules(limit: int = 500) -> list[dict[str, Any]]:
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(

@@ -2,13 +2,16 @@ import { NavLink, Outlet } from "react-router-dom";
 
 export default function AppLayout() {
   return (
-    <>
+    <div className="app-shell">
       <header className="app-header">
         <div className="app-header-inner">
-          <div>
-            <h1>ISISlike — Chemical Inventory & ELN</h1>
-            <p>Phase 2A: Dynamic databases with custom fields and compound records.</p>
-          </div>
+          <NavLink to="/" end className="app-brand">
+            <span className="app-brand-mark" aria-hidden="true" />
+            <span className="app-brand-text">
+              <span className="app-brand-name">ISISlike</span>
+              <span className="app-brand-tagline">Chemical Inventory & ELN</span>
+            </span>
+          </NavLink>
           <nav className="app-nav" aria-label="Main">
             <NavLink to="/" end>
               Structures
@@ -18,6 +21,6 @@ export default function AppLayout() {
         </div>
       </header>
       <Outlet />
-    </>
+    </div>
   );
 }

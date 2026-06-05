@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   deleteMolecule,
   getMolecule,
@@ -6,7 +7,6 @@ import {
   type Molecule,
   type MoleculeDetail,
 } from "../api/cheminformatics";
-import LinkedDatabaseRecords from "./LinkedDatabaseRecords";
 import StructureImage from "./StructureImage";
 
 interface Props {
@@ -82,17 +82,11 @@ export default function MoleculeDetailDrawer({
           ? {
               ...d,
               ...updated,
-              linked_database_records:
-                updated.linked_database_records ?? d.linked_database_records,
             }
           : null
       );
       setStatus("Saved.");
-      onUpdated({
-        ...updated,
-        linked_database_records:
-          detail?.linked_database_records ?? updated.linked_database_records,
-      });
+      onUpdated(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -181,9 +175,15 @@ export default function MoleculeDetailDrawer({
                 </div>
               </dl>
 
-              <LinkedDatabaseRecords
-                records={detail.linked_database_records ?? []}
-              />
+              <div className="detail-actions" style={{ marginBottom: "1rem" }}>
+                <Link
+                  to={`/compounds/${detail.id}`}
+                  className="secondary"
+                  onClick={onClose}
+                >
+                  View full Compound Record →
+                </Link>
+              </div>
 
               <div className="detail-form">
                 <label htmlFor="mol-name">Name</label>

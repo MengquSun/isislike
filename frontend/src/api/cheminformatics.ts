@@ -28,7 +28,11 @@ function formatNetworkError(op: string, err: unknown): string {
   return err instanceof Error ? err.message : `${op} failed`;
 }
 
-import type { LinkedDatabaseRecord } from "./databases";
+import type {
+  LinkedDatabaseRecord,
+  MoleculeDatabaseRecord,
+  MoleculeDatabaseRecordFilters,
+} from "./databases";
 
 export interface Molecule {
   id: string;
@@ -43,7 +47,11 @@ export interface Molecule {
   linked_database_records?: LinkedDatabaseRecord[];
 }
 
-export type { LinkedDatabaseRecord };
+export type {
+  LinkedDatabaseRecord,
+  MoleculeDatabaseRecord,
+  MoleculeDatabaseRecordFilters,
+};
 
 export interface MoleculeDetail extends Molecule {
   has_structure_svg: boolean;
@@ -97,6 +105,34 @@ export async function listMolecules(limit = 500): Promise<Molecule[]> {
 
 export async function getMolecule(id: string): Promise<MoleculeDetail> {
   return request<MoleculeDetail>(`/molecules/${id}`);
+}
+
+export async function getMoleculeDatabaseRecords(
+  moleculeId: string,
+  filters: MoleculeDatabaseRecordFilters = {}
+): Promise<MoleculeDatabaseRecord[]> {
+  const params = new URLSearchParams();
+  if (filters.source_database?.trim()) {
+    params.set("source_database", filters.source_database.trim());
+  }
+  if (filters.field_name?.trim()) {
+    params.set("field_name", filters.field_name.trim());
+  }
+  if (filters.keyword?.trim()) {
+    params.set("keyword", filters.keyword.trim());
+  }
+  if (filters.date_from?.trim()) {
+    const d = filters.date_from.trim();
+    params.set("date_from", d.includes("T") ? d : `${d}T00:00:00`);
+  }
+  if (filters.date_to?.trim()) {
+    const d = filters.date_to.trim();
+    params.set("date_to", d.includes("T") ? d : `${d}T23:59:59`);
+  }
+  const qs = params.toString();
+  return request<MoleculeDatabaseRecord[]>(
+    `/molecules/${encodeURIComponent(moleculeId)}/database-records${qs ? `?${qs}` : ""}`
+  );
 }
 
 export async function updateMolecule(

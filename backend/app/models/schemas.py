@@ -124,6 +124,18 @@ class LinkedDatabaseRecord(BaseModel):
     database_id: str
     database_name: str
     canonical_smiles: str
+    created_at: str | None = None
+    updated_at: str | None = None
+    values: list[RecordValueResponse] = Field(default_factory=list)
+
+
+class MoleculeDatabaseRecordResponse(BaseModel):
+    id: str
+    molecule_id: str
+    source_database: str
+    database_id: str
+    created_at: str | None = None
+    updated_at: str | None = None
     values: list[RecordValueResponse] = Field(default_factory=list)
 
 
@@ -157,6 +169,60 @@ class MoleculeIdsInput(BaseModel):
 class LinkedRecordsByMolecule(BaseModel):
     molecule_id: str
     records: list[LinkedDatabaseRecord] = Field(default_factory=list)
+
+
+# --- Custom export ---
+
+EXPORT_ATTRIBUTES = frozenset(
+    {
+        "canonical_smiles",
+        "molecular_weight",
+        "molecular_formula",
+        "created_at",
+        "updated_at",
+        "name",
+        "notes",
+        "structure_image",
+    }
+)
+
+
+class ExportFilters(BaseModel):
+    canonical_smiles: str | None = None
+    formula: str | None = None
+    name: str | None = None
+
+
+EXPORT_FORMATS = frozenset({"xlsx", "csv"})
+EXPORT_FIELD_SORTS = frozenset({"alphabetical", "definition_order"})
+
+
+class ExportPreviewRequest(BaseModel):
+    filters: ExportFilters = Field(default_factory=ExportFilters)
+    all_chemicals: bool = False
+
+
+class ExportPreviewChemical(BaseModel):
+    id: str
+    name: str | None = None
+    canonical_smiles: str
+    formula: str | None = None
+
+
+class ExportPreviewResponse(BaseModel):
+    chemicals: list[ExportPreviewChemical] = Field(default_factory=list)
+
+
+class ExportCustomRequest(BaseModel):
+    chemical_ids: list[str] = Field(..., min_length=1, max_length=2000)
+    attributes: list[str] = Field(default_factory=list)
+    format: str = "xlsx"
+    field_sort: str = "alphabetical"
+
+
+class ExportConfigResponse(BaseModel):
+    enabled: bool
+    require_key: bool
 
 
 MoleculeResponse.model_rebuild()
